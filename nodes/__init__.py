@@ -42,10 +42,14 @@ from .color_grading import (
 
 from .color_analysis import (
     DominantColors,
+    DominantColorsAdvanced,
+    DominantColorsAdvancedMultiple,
     ColorHistogram,
     ColorPalette,
     ColorSimilarity,
     ColorHarmony,
+    LuminanceCalculator,
+    CollageBackgroundColor,
 )
 
 from .vector_scope import (
@@ -86,11 +90,15 @@ __all__ = [
     
     # Dual Input Analysis Nodes
     "DominantColors",
+    "DominantColorsAdvanced",
+    "DominantColorsAdvancedMultiple",
     "ColorHistogram",
     "ColorPalette",
     "ColorSimilarity",
     "ColorHarmony",
-    
+    "LuminanceCalculator",
+    "CollageBackgroundColor",
+
     # Vector Scope Node
     "VectorScope",
     

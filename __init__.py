@@ -31,12 +31,15 @@ try:
     
     # Dual input conversion nodes
     from .nodes.color_conversion import ColorSpaceConverter, ColorTemperature, ColorSpaceAnalyzer
+    from .nodes.rgb_hex_adjust import RGBHexAdjust
     
     # Dual input grading nodes
     from .nodes.color_grading import ColorBalance, BrightnessContrast, Saturation, HueShift, GammaCorrection
     
     # Dual input analysis nodes
-    from .nodes.color_analysis import DominantColors, ColorHistogram, ColorPalette, ColorSimilarity, ColorHarmony
+    from .nodes.color_analysis import DominantColors, DominantColorsAdvanced, DominantColorsAdvancedMultiple, ColorHistogram, ColorPalette, ColorSimilarity, ColorHarmony, LuminanceCalculator, CollageBackgroundColor
+    from .nodes.natural_background_color import NaturalBackgroundColor
+    from .nodes.rgb_array_resolve import RGBArrayResolve
     
     # Vector scope node
     from .nodes.vector_scope import VectorScopeNode
@@ -60,6 +63,7 @@ try:
         "ColorSpaceConverter": ColorSpaceConverter,
         "ColorTemperature": ColorTemperature,
         "ColorSpaceAnalyzer": ColorSpaceAnalyzer,
+        "RGBHexAdjust": RGBHexAdjust,
         
         # Dual input grading nodes
         "ColorBalance": ColorBalance,
@@ -70,10 +74,16 @@ try:
         
         # Dual input analysis nodes
         "DominantColors": DominantColors,
+        "DominantColorsAdvanced": DominantColorsAdvanced,
+        "DominantColorsAdvancedMultiple": DominantColorsAdvancedMultiple,
         "ColorHistogram": ColorHistogram,
         "ColorPalette": ColorPalette,
         "ColorSimilarity": ColorSimilarity,
         "ColorHarmony": ColorHarmony,
+        "LuminanceCalculator": LuminanceCalculator,
+        "CollageBackgroundColor": CollageBackgroundColor,
+        "NaturalBackgroundColor": NaturalBackgroundColor,
+        "RGBArrayResolve": RGBArrayResolve,
         
         # Vector scope node
         "VectorScope": VectorScopeNode,
@@ -105,6 +115,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ColorSpaceConverter": "Color Space Converter",
     "ColorTemperature": "Color Temperature",
     "ColorSpaceAnalyzer": "Color Space Analyzer",
+    "RGBHexAdjust": "RGB/HEX Convert + Adjust",
     
     # Dual input grading nodes
     "ColorBalance": "Color Balance",
@@ -115,10 +126,16 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     
     # Dual input analysis nodes
     "DominantColors": "Dominant Colors",
+    "DominantColorsAdvanced": "Dominant Colors Advanced",
+    "DominantColorsAdvancedMultiple": "Dominant Colors Advanced (Multiple)",
     "ColorHistogram": "Color Histogram",
     "ColorPalette": "Color Palette",
     "ColorSimilarity": "Color Similarity",
     "ColorHarmony": "Color Harmony",
+    "LuminanceCalculator": "Luminance Calculator",
+    "CollageBackgroundColor": "Collage Background Color",
+    "NaturalBackgroundColor": "Color Harmonizer",
+    "RGBArrayResolve": "RGB Array Resolve",
     
     # Vector scope node
     "VectorScope": "Vector Scope",
