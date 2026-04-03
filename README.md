@@ -6,6 +6,30 @@ A ComfyUI custom node for reading color profiles and color space information fro
 
 ## ✨ Added in `color-tools-advanced` branch
 
+本分支基于 [APZmedia/ComfyUI-color-tools](https://github.com/APZmedia/ComfyUI-color-tools) 原作，在不修改原有节点的前提下，新增了一组面向**拼版配色、主色提取、亮度判断**场景的实用节点。
+
+### 改动背景
+
+原版 `Dominant Colors` 节点对整张图做全局 K-means，无法控制采样区域。在拼版场景中，我们通常只关心图片边缘色（用于选取底色），或者需要同时处理多张尺寸不一的图片。此外，原版缺少：从颜色判断应使用深色还是浅色文字的亮度计算、HEX/RGB 互转与 HSV 微调、以及将主色结果拆解为单个颜色的工具节点。
+
+这些新增节点围绕以下几个工作流设计：
+
+- **拼版底色选取**：加载多张图 → Dominant Colors Advanced (Multiple) 提取边缘主色 → Collage Background Color 生成去饱和底色
+- **UI 文字颜色决策**：获取背景色 → Luminance Calculator 计算亮度 → 根据阈值选深色或浅色文字
+- **单色调整与传递**：RGB/HEX Convert + Adjust 做 HSV 微调 → RGB Array Resolve 拆出单个颜色 → 接入下游节点
+
+### 新增节点一览
+
+| 节点名 | 分类 | 简介 |
+|--------|------|------|
+| Dominant Colors Advanced | Color Tools/Analysis | 支持全图 / 边缘 / 中心三种采样模式，输出主色色带预览 |
+| Dominant Colors Advanced (Multiple) | Color Tools/Analysis | 多图版本，支持 batch 和 list 输入，合并像素池后统一聚类 |
+| Luminance Calculator | Color Tools/Analysis | W3C WCAG 相对亮度公式，判断颜色深浅 |
+| Collage Background Color | Color Tools/Analysis | 提取多图边缘色，K-means 后去饱和，输出拼版底色 |
+| RGB/HEX Convert + Adjust | Color Tools/Conversion | HEX ↔ RGB 互转 + HSV 调整（色相、饱和度、明度） |
+| RGB Array Resolve | Color Tools/Analysis | 按索引从主色数组中取出单个颜色，输出 R/G/B + HEX + 预览 |
+| Color Harmonizer | Color Tools/Analysis | 基于图片主色色相，生成互补 / 类似 / 三角等和谐配色 |
+
 The following nodes were added on top of the original package.
 
 ---
