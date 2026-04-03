@@ -2,6 +2,148 @@
 
 A ComfyUI custom node for reading color profiles and color space information from image files. This node extracts ICC profiles, PNG color space chunks, and other color metadata to help you understand the color characteristics of your images.
 
+---
+
+## ✨ Added in `color-tools-advanced` branch
+
+The following nodes were added on top of the original package.
+
+---
+
+### **🎯 Dominant Colors Advanced**
+**Category:** Color Tools/Analysis
+
+An upgraded version of Dominant Colors with sampling zone control.
+
+**Inputs:**
+- `input_mode` (COMBO): `tensor` (IMAGE socket) or `file` (image_path string)
+- `num_colors` (INT): Number of dominant colors to extract (1–20)
+- `color_format` (COMBO): Output format — `RGB`, `HSV`, or `HEX`
+- `sample_mode` (COMBO): `full` (whole image), `edge` (outer border strip), `center` (inner rectangle)
+- `edge_ratio` (FLOAT): Border thickness as a fraction of image size (0.01–0.5); only applies to `edge` / `center` modes
+- `image` (IMAGE, optional): Input tensor
+- `image_path` (STRING, optional): File path when using `file` mode
+
+**Outputs:**
+- `dominant_colors` (STRING): JSON list of colors, sorted by prevalence
+- `color_percentages` (STRING): JSON list of pixel proportions per color
+- `sample_area_preview` (IMAGE): Original image with the sampled region highlighted in green (80% opacity)
+- `dom_clr_preview` (IMAGE): 512×64 horizontal color strip — each color band is proportional to its percentage
+
+---
+
+### **🎯 Dominant Colors Advanced (Multiple)**
+**Category:** Color Tools/Analysis
+
+Batch / list-aware version of Dominant Colors Advanced. Accepts both IMAGE batch tensors and IMAGE lists (different sizes supported). Pixels from all images are merged into one pool before K-means, producing a single shared color result.
+
+**Inputs:**
+- `images` (IMAGE): Batch tensor (e.g. Load Image Batch) or image list (e.g. Load Images From Dir — preserves individual aspect ratios)
+- `num_colors`, `color_format`, `sample_mode`, `edge_ratio`: Same as above
+
+**Outputs:**
+- `dominant_colors` (STRING): Merged dominant colors as JSON
+- `color_percentages` (STRING): Proportions across the merged pixel pool
+- `sample_area_preview` (IMAGE): Per-image previews stacked into a batch (all resized to the first image's dimensions)
+- `dom_clr_preview` (IMAGE): 512×64 color strip for the merged result
+
+> Tip: Use an image list loader (not batch) to preserve each image's original aspect ratio for accurate edge/center sampling.
+
+---
+
+### **💡 Luminance Calculator**
+**Category:** Color Tools/Analysis
+
+Calculates perceptual luminance from a color using the W3C WCAG relative luminance formula (sRGB IEC 61966-2-1 gamma correction). Useful for deciding whether to display light or dark UI text on a given background color.
+
+**Inputs:**
+- `input_mode` (COMBO): `RGB` or `HEX`
+- `red`, `green`, `blue` (FLOAT): Normalized 0–1 values (used in RGB mode)
+- `hex_color` (STRING): `#RRGGBB` hex string (used in HEX mode)
+
+**Outputs:**
+- `luminance` (FLOAT): Relative luminance value in [0, 1]; values above ~0.179 are considered "light"
+- `result_json` (STRING): Full calculation details as JSON
+
+---
+
+### **🖼️ Collage Background Color**
+**Category:** Color Tools/Analysis
+
+Samples edge pixels from all images in a batch, runs K-means to find the most representative background color, then desaturates it slightly for a neutral collage background.
+
+**Inputs:**
+- `image` (IMAGE): Batch of images
+- `num_colors` (INT): K-means clusters (1–10)
+- `edge_ratio` (FLOAT): Border thickness as fraction of image size
+- `desaturation` (FLOAT): How much to reduce saturation (0 = no change, 1 = fully grey)
+
+**Outputs:**
+- `hex_color` (STRING): Output color as `#RRGGBB`
+- `red`, `green`, `blue` (FLOAT): Normalized RGB components
+
+---
+
+### **🎨 RGB/HEX Convert + Adjust**
+**Category:** Color Tools/Conversion
+
+Converts between HEX and RGB and applies HSV-based adjustments (hue shift, saturation scale, value scale/offset).
+
+**Inputs:**
+- `input_mode` (COMBO): `HEX` or `RGB`
+- `hex_color` (STRING): Input color as `#RRGGBB`
+- `red`, `green`, `blue` (FLOAT): Input color as normalized RGB (used when mode is RGB)
+- `hue_shift` (FLOAT): Hue rotation in degrees (−180 to 180)
+- `saturation_scale` (FLOAT): Multiply saturation (0–3)
+- `value_scale` (FLOAT): Multiply brightness (0–3)
+- `value_offset` (FLOAT): Add/subtract brightness (−1 to 1)
+
+**Outputs:**
+- `rgb_array` (STRING): JSON `[[r, g, b]]` — compatible with RGB Array Resolve
+- `hex_color` (STRING): Adjusted color as `#RRGGBB`
+- `hue`, `saturation`, `value` (FLOAT): HSV components of the output color
+- `info_json` (STRING): Full input/output details as JSON
+- `preview` (IMAGE): 512×512 solid color swatch
+
+---
+
+### **🔢 RGB Array Resolve**
+**Category:** Color Tools/Analysis
+
+Picks one color from an RGB array (e.g. output of Dominant Colors or RGB/HEX Convert + Adjust) by index and outputs it as individual R/G/B values and a HEX string.
+
+**Inputs:**
+- `rgb_array` (STRING): JSON array of RGB triplets — accepts normalized (0–1) or byte (0–255) values, auto-detected
+- `color_index` (INT): Which color to pick (0-based)
+- `clamp_index` (BOOLEAN): If true, clamps out-of-range indices instead of erroring
+- `rgb_output_mode` (COMBO): `byte` (0–255) or `normalized` (0–1)
+- `preview_width`, `preview_height` (INT): Size of the output swatch
+
+**Outputs:**
+- `red`, `green`, `blue` (FLOAT): Color components in selected mode
+- `hex_color` (STRING): Color as `#RRGGBB`
+- `preview` (IMAGE): Solid color swatch
+
+---
+
+### **🌈 Color Harmonizer** *(NaturalBackgroundColor)*
+**Category:** Color Tools/Analysis
+
+Analyzes the dominant hue of an image and generates a harmonious background color using standard color theory relationships (complementary, analogous, triadic, etc.). Saturation and value are adjustable.
+
+**Inputs:**
+- `image` (IMAGE): Input image
+- `harmony_type` (COMBO): Harmony relationship — `complementary`, `analogous`, `triadic`, `split-complementary`, `tetradic`, `monochromatic`
+- `saturation` (FLOAT): Saturation of the output color (0–1)
+- `value` (FLOAT): Brightness of the output color (0–1)
+
+**Outputs:**
+- `hex_color` (STRING): Harmonious background color as `#RRGGBB`
+- `red`, `green`, `blue` (FLOAT): Normalized RGB
+- `harmony_info` (STRING): JSON with source hue, harmony type, and output color details
+
+---
+
 ## 🎨 Features
 
 ### **Color Profile Detection**
@@ -469,148 +611,6 @@ ComfyUI-color-tools/
 └── examples/
     └── color_profile_workflow.json
 ```
-
----
-
-## ✨ Added in `color-tools-advanced` branch
-
-The following nodes were added on top of the original package.
-
----
-
-### **🎯 Dominant Colors Advanced**
-**Category:** Color Tools/Analysis
-
-An upgraded version of Dominant Colors with sampling zone control.
-
-**Inputs:**
-- `input_mode` (COMBO): `tensor` (IMAGE socket) or `file` (image_path string)
-- `num_colors` (INT): Number of dominant colors to extract (1–20)
-- `color_format` (COMBO): Output format — `RGB`, `HSV`, or `HEX`
-- `sample_mode` (COMBO): `full` (whole image), `edge` (outer border strip), `center` (inner rectangle)
-- `edge_ratio` (FLOAT): Border thickness as a fraction of image size (0.01–0.5); only applies to `edge` / `center` modes
-- `image` (IMAGE, optional): Input tensor
-- `image_path` (STRING, optional): File path when using `file` mode
-
-**Outputs:**
-- `dominant_colors` (STRING): JSON list of colors, sorted by prevalence
-- `color_percentages` (STRING): JSON list of pixel proportions per color
-- `sample_area_preview` (IMAGE): Original image with the sampled region highlighted in green (80% opacity)
-- `dom_clr_preview` (IMAGE): 512×64 horizontal color strip — each color band is proportional to its percentage
-
----
-
-### **🎯 Dominant Colors Advanced (Multiple)**
-**Category:** Color Tools/Analysis
-
-Batch / list-aware version of Dominant Colors Advanced. Accepts both IMAGE batch tensors and IMAGE lists (different sizes supported). Pixels from all images are merged into one pool before K-means, producing a single shared color result.
-
-**Inputs:**
-- `images` (IMAGE): Batch tensor (e.g. Load Image Batch) or image list (e.g. Load Images From Dir — preserves individual aspect ratios)
-- `num_colors`, `color_format`, `sample_mode`, `edge_ratio`: Same as above
-
-**Outputs:**
-- `dominant_colors` (STRING): Merged dominant colors as JSON
-- `color_percentages` (STRING): Proportions across the merged pixel pool
-- `sample_area_preview` (IMAGE): Per-image previews stacked into a batch (all resized to the first image's dimensions)
-- `dom_clr_preview` (IMAGE): 512×64 color strip for the merged result
-
-> Tip: Use an image list loader (not batch) to preserve each image's original aspect ratio for accurate edge/center sampling.
-
----
-
-### **💡 Luminance Calculator**
-**Category:** Color Tools/Analysis
-
-Calculates perceptual luminance from a color using the W3C WCAG relative luminance formula (sRGB IEC 61966-2-1 gamma correction). Useful for deciding whether to display light or dark UI text on a given background color.
-
-**Inputs:**
-- `input_mode` (COMBO): `RGB` or `HEX`
-- `red`, `green`, `blue` (FLOAT): Normalized 0–1 values (used in RGB mode)
-- `hex_color` (STRING): `#RRGGBB` hex string (used in HEX mode)
-
-**Outputs:**
-- `luminance` (FLOAT): Relative luminance value in [0, 1]; values above ~0.179 are considered "light"
-- `result_json` (STRING): Full calculation details as JSON
-
----
-
-### **🖼️ Collage Background Color**
-**Category:** Color Tools/Analysis
-
-Samples edge pixels from all images in a batch, runs K-means to find the most representative background color, then desaturates it slightly for a neutral collage background.
-
-**Inputs:**
-- `image` (IMAGE): Batch of images
-- `num_colors` (INT): K-means clusters (1–10)
-- `edge_ratio` (FLOAT): Border thickness as fraction of image size
-- `desaturation` (FLOAT): How much to reduce saturation (0 = no change, 1 = fully grey)
-
-**Outputs:**
-- `hex_color` (STRING): Output color as `#RRGGBB`
-- `red`, `green`, `blue` (FLOAT): Normalized RGB components
-
----
-
-### **🎨 RGB/HEX Convert + Adjust**
-**Category:** Color Tools/Conversion
-
-Converts between HEX and RGB and applies HSV-based adjustments (hue shift, saturation scale, value scale/offset).
-
-**Inputs:**
-- `input_mode` (COMBO): `HEX` or `RGB`
-- `hex_color` (STRING): Input color as `#RRGGBB`
-- `red`, `green`, `blue` (FLOAT): Input color as normalized RGB (used when mode is RGB)
-- `hue_shift` (FLOAT): Hue rotation in degrees (−180 to 180)
-- `saturation_scale` (FLOAT): Multiply saturation (0–3)
-- `value_scale` (FLOAT): Multiply brightness (0–3)
-- `value_offset` (FLOAT): Add/subtract brightness (−1 to 1)
-
-**Outputs:**
-- `rgb_array` (STRING): JSON `[[r, g, b]]` — compatible with RGB Array Resolve
-- `hex_color` (STRING): Adjusted color as `#RRGGBB`
-- `hue`, `saturation`, `value` (FLOAT): HSV components of the output color
-- `info_json` (STRING): Full input/output details as JSON
-- `preview` (IMAGE): 512×512 solid color swatch
-
----
-
-### **🔢 RGB Array Resolve**
-**Category:** Color Tools/Analysis
-
-Picks one color from an RGB array (e.g. output of Dominant Colors or RGB/HEX Convert + Adjust) by index and outputs it as individual R/G/B values and a HEX string.
-
-**Inputs:**
-- `rgb_array` (STRING): JSON array of RGB triplets — accepts normalized (0–1) or byte (0–255) values, auto-detected
-- `color_index` (INT): Which color to pick (0-based)
-- `clamp_index` (BOOLEAN): If true, clamps out-of-range indices instead of erroring
-- `rgb_output_mode` (COMBO): `byte` (0–255) or `normalized` (0–1)
-- `preview_width`, `preview_height` (INT): Size of the output swatch
-
-**Outputs:**
-- `red`, `green`, `blue` (FLOAT): Color components in selected mode
-- `hex_color` (STRING): Color as `#RRGGBB`
-- `preview` (IMAGE): Solid color swatch
-
----
-
-### **🌈 Color Harmonizer** *(NaturalBackgroundColor)*
-**Category:** Color Tools/Analysis
-
-Analyzes the dominant hue of an image and generates a harmonious background color using standard color theory relationships (complementary, analogous, triadic, etc.). Saturation and value are adjustable.
-
-**Inputs:**
-- `image` (IMAGE): Input image
-- `harmony_type` (COMBO): Harmony relationship — `complementary`, `analogous`, `triadic`, `split-complementary`, `tetradic`, `monochromatic`
-- `saturation` (FLOAT): Saturation of the output color (0–1)
-- `value` (FLOAT): Brightness of the output color (0–1)
-
-**Outputs:**
-- `hex_color` (STRING): Harmonious background color as `#RRGGBB`
-- `red`, `green`, `blue` (FLOAT): Normalized RGB
-- `harmony_info` (STRING): JSON with source hue, harmony type, and output color details
-
----
 
 ## 🤝 Contributing
 
