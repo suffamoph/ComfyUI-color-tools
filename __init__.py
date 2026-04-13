@@ -41,9 +41,12 @@ try:
     from .nodes.natural_background_color import NaturalBackgroundColor
     from .nodes.rgb_array_resolve import RGBArrayResolve
     
+    # Color space inspector node
+    from .nodes.color_space_inspector import ColorSpaceInspector
+
     # Vector scope node
     from .nodes.vector_scope import VectorScopeNode
-    
+
     # OCIO nodes
     from .nodes.ocio_tools import OCIOColorSpaceConverter, OCIOConfigInfo, TestPatternGenerator
     from .nodes.ocio_advanced import AdvancedOcioColorTransform
@@ -85,6 +88,9 @@ try:
         "NaturalBackgroundColor": NaturalBackgroundColor,
         "RGBArrayResolve": RGBArrayResolve,
         
+        # Color space inspector node
+        "ColorSpaceInspector": ColorSpaceInspector,
+
         # Vector scope node
         "VectorScope": VectorScopeNode,
         
@@ -137,6 +143,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NaturalBackgroundColor": "Color Harmonizer",
     "RGBArrayResolve": "RGB Array Resolve",
     
+    # Color space inspector node
+    "ColorSpaceInspector": "Color Space Inspector",
+
     # Vector scope node
     "VectorScope": "Vector Scope",
     

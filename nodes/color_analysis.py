@@ -1063,6 +1063,10 @@ class LuminanceCalculator:
         "【输入模式】\n"
         "• rgb：输入 R / G / B 三个通道（0~255）\n"
         "• hex：输入十六进制颜色字符串，如 #ff3a2b 或 ff3a2b\n\n"
+        "【亮度阈值】\n"
+        "• 0.179（WCAG precise）：白字/黑字对比度相等的数学精确点\n"
+        "• 0.200（conservative）：略保守，更早切换到深色字\n"
+        "• 0.350（perceptual）：贴近人眼感知，视觉体验优先\n\n"
         "【输出】\n"
         "• luminance（FLOAT）：感知亮度，范围 0（纯黑）~ 1（纯白）\n"
         "• result_json（STRING）：JSON，包含输入颜色、亮度值、推荐 UI 主题（dark / light）"
@@ -1073,6 +1077,14 @@ class LuminanceCalculator:
         return {
             "required": {
                 "input_mode": (["rgb", "hex"], {"default": "hex"}),
+                "luminance_threshold": (
+                    [
+                        "0.350  (perceptual)",
+                        "0.200  (conservative)",
+                        "0.179  (WCAG precise)",
+                    ],
+                    {"default": "0.350  (perceptual)"},
+                ),
             },
             "optional": {
                 "hex_color": ("STRING", {"default": "#ffffff", "multiline": False}),
@@ -1087,13 +1099,14 @@ class LuminanceCalculator:
     FUNCTION = "calculate"
     CATEGORY = "Color Tools/Analysis"
 
-    def calculate(self, input_mode: str, hex_color: str = "#ffffff",
-                  r: int = 255, g: int = 255, b: int = 255):
+    def calculate(self, input_mode: str, luminance_threshold: str = "0.350  (perceptual)",
+                  hex_color: str = "#ffffff", r: int = 255, g: int = 255, b: int = 255):
         if input_mode == "hex":
             r, g, b = self._hex_to_rgb(hex_color)
         hex_out = "#{:02x}{:02x}{:02x}".format(r, g, b)
         luminance = self._relative_luminance(r, g, b)
-        ui_theme = "dark" if luminance > 0.179 else "light"
+        threshold = float(luminance_threshold.split()[0])
+        ui_theme = "dark" if luminance > threshold else "light"
         result = {
             "input": {"hex": hex_out, "r": r, "g": g, "b": b},
             "luminance": round(luminance, 6),

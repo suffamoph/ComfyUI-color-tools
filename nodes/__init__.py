@@ -56,6 +56,10 @@ from .vector_scope import (
     VectorScope,
 )
 
+from .color_space_inspector import (
+    ColorSpaceInspector,
+)
+
 # Import utility functions
 from .color_utils import (
     ColorInputHandler,
@@ -101,6 +105,9 @@ __all__ = [
 
     # Vector Scope Node
     "VectorScope",
+
+    # Color Space Inspector
+    "ColorSpaceInspector",
     
     # Utility Functions
     "ColorInputHandler",
