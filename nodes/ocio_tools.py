@@ -43,16 +43,13 @@ class OCIOColorSpaceConverter:
     CATEGORY = "Color Tools/OCIO"
 
     def convert_colorspace(self, image: torch.Tensor, ocio_config_path: str,
-                          source_colorspace: str, target_colorspace: str) -> Tuple[torch.Tensor, str]:
-        """
-        Convert image between color spaces using OCIO.
-        """
+                           source_colorspace: str, target_colorspace: str) -> Tuple[torch.Tensor, str]:
         if ocio is None:
             raise ImportError("PyOpenColorIO is required for OCIO color space conversion")
 
         # Convert tensor to numpy (handle batch and non-batch)
         if len(image.shape) == 4:
-            batch_size, h, w, c = image.shape
+            h, w, c = image.shape[1], image.shape[2], image.shape[3]
             img_np = image[0].cpu().numpy()
         else:
             h, w, c = image.shape
@@ -65,9 +62,9 @@ class OCIOColorSpaceConverter:
         # Handle alpha channel
         if c == 4:
             alpha = img_np[:, :, 3:4].copy()
-            img_rgb = img_np[:, :, :3]
+            img_rgb = img_np[:, :, :3].copy()
         else:
-            img_rgb = img_np
+            img_rgb = img_np.copy()
             alpha = None
 
         # Load OCIO configuration
@@ -88,25 +85,20 @@ class OCIOColorSpaceConverter:
         except Exception as e:
             return image, f"Error accessing color spaces: {str(e)}"
 
-        # Create processor for color space conversion
+        # Create processor
         try:
             processor = config.getProcessor(source_colorspace, target_colorspace).getDefaultCPUProcessor()
         except Exception as e:
             return image, f"Failed to create processor: {str(e)}"
 
-        # Convert to OCIO-friendly format
-        # OCIO expects float32, RGB, row-major
-        img_flat = img_rgb.astype(np.float32).flatten()
-        pixel_count = len(img_flat) // 3
-
-        # Apply OCIO transform (process RGB channels)
-        for i in range(pixel_count):
-            rgb_pixel = img_flat[i*3:(i+1)*3]
-            processed_rgb = processor.applyRGB(rgb_pixel)
-            img_flat[i*3:(i+1)*3] = processed_rgb
-
-        # Reshape back
-        result_rgb = img_flat.reshape((h, w, 3))
+        # Apply transform using PackedImageDesc (fast bulk processing, no pixel loop)
+        try:
+            img_f32 = np.ascontiguousarray(img_rgb, dtype=np.float32)
+            image_desc = ocio.PackedImageDesc(img_f32, w, h, 3)
+            processor.apply(image_desc)
+            result_rgb = img_f32
+        except Exception as e:
+            return image, f"Failed to apply transform: {str(e)}"
 
         # Reattach alpha if present
         if alpha is not None:
@@ -119,7 +111,6 @@ class OCIOColorSpaceConverter:
         if len(image.shape) == 4:
             result_tensor = result_tensor.unsqueeze(0)
 
-        # Conversion info
         info = {
             "source_colorspace": source_colorspace,
             "target_colorspace": target_colorspace,
@@ -150,11 +141,8 @@ class OCIOConfigInfo:
     CATEGORY = "Color Tools/OCIO"
 
     def get_config_info(self, ocio_config_path: str) -> Tuple[str]:
-        """
-        Get information about the OCIO configuration.
-        """
         if ocio is None:
-            return ["PyOpenColorIO not available"]
+            return ("PyOpenColorIO not available",)
 
         try:
             if ocio_config_path.strip():
@@ -162,23 +150,31 @@ class OCIOConfigInfo:
             else:
                 config = ocio.GetCurrentConfig()
         except Exception as e:
-            return [f"Failed to load config: {str(e)}"]
+            return (f"Failed to load config: {str(e)}",)
 
-        # Get color spaces
+        # Color spaces
         color_spaces = []
         for cs in config.getColorSpaces():
-            color_spaces.append(f"- {cs.getName()} ({cs.getFamily()})")
+            family = cs.getFamily()
+            family_str = f" ({family})" if family else ""
+            color_spaces.append(f"- {cs.getName()}{family_str}")
 
-        # Get displays and views
+        # Displays and views
         displays_views = []
         for display in config.getDisplays():
             for view in config.getViews(display):
                 displays_views.append(f"- {display}: {view}")
 
+        # Roles — use getRoles() to avoid deprecated enum API
+        roles_info = []
+        try:
+            for role_name, cs_name in config.getRoles():
+                roles_info.append(f"- {role_name}: {cs_name}")
+        except Exception:
+            roles_info = ["(Unable to read roles)"]
+
         info = f"""OCIO Configuration Info:
 Config File: {ocio_config_path if ocio_config_path else 'Default'}
-
-Working Color Space: {config.getColorSpace(config.getCanonicalName(ocio.REFERENCE_SPACE_SCENE))}
 
 Color Spaces ({len(color_spaces)}):
 {chr(10).join(color_spaces)}
@@ -187,11 +183,9 @@ Displays/Views ({len(displays_views)}):
 {chr(10).join(displays_views)}
 
 Roles:
-- color_picking: {config.getColorSpace(config.getCanonicalName(ocio.REFERENCE_SPACE_DISPLAY)) if config.getCanonicalName(ocio.REFERENCE_SPACE_DISPLAY) else 'Not defined'}
-- scene_linear: {config.getColorSpace(config.getCanonicalName(ocio.REFERENCE_SPACE_SCENE)) if config.getCanonicalName(ocio.REFERENCE_SPACE_SCENE) else 'Not defined'}
+{chr(10).join(roles_info)}
 """
-
-        return [info]
+        return (info,)
 
 
 class TestPatternGenerator:
@@ -216,10 +210,6 @@ class TestPatternGenerator:
     CATEGORY = "Color Tools/OCIO"
 
     def generate_test_pattern(self, pattern_type: str, width: int, height: int) -> Tuple[torch.Tensor, str]:
-        """
-        Generate a test pattern for color space validation.
-        """
-        # Create empty image
         pattern = np.zeros((height, width, 3), dtype=np.float32)
 
         if pattern_type == "Color Bars":
@@ -238,118 +228,69 @@ class TestPatternGenerator:
             self._generate_color_checker(pattern)
             info = "ColorChecker: 24 standard color patches"
         else:
-            # Default to color bars
             self._generate_color_bars(pattern)
             info = "Color Bars: Primary colors test pattern"
 
-        # Convert to tensor and add batch dimension
         pattern_tensor = torch.from_numpy(pattern).float().unsqueeze(0)
-
         return pattern_tensor, info
 
     def _generate_color_bars(self, pattern: np.ndarray) -> None:
-        """Generate basic color bars."""
         h, w = pattern.shape[:2]
         bar_width = w // 8
-
-        # Red
         pattern[:, :bar_width, 0] = 1.0
-        # Green
         pattern[:, bar_width:2*bar_width, 1] = 1.0
-        # Blue
         pattern[:, 2*bar_width:3*bar_width, 2] = 1.0
-        # Cyan
         pattern[:, 3*bar_width:4*bar_width, 1:] = 1.0
-        # Magenta
         pattern[:, 4*bar_width:5*bar_width, [0, 2]] = 1.0
-        # Yellow
         pattern[:, 5*bar_width:6*bar_width, [0, 1]] = 1.0
-        # White
         pattern[:, 6*bar_width:7*bar_width, :] = 1.0
-        # Black
         pattern[:, 7*bar_width:, :] = 0.0
 
     def _generate_tone_ramp(self, pattern: np.ndarray) -> None:
-        """Generate a linear tone ramp."""
         h, w = pattern.shape[:2]
-        for x in range(w):
-            intensity = x / (w - 1)
-            pattern[:, x, :] = intensity
+        ramp = np.linspace(0.0, 1.0, w, dtype=np.float32)
+        pattern[:, :, :] = ramp[np.newaxis, :, np.newaxis]
 
     def _generate_gray_ramp(self, pattern: np.ndarray) -> None:
-        """Generate a gray ramp."""
-        h, w = pattern.shape[:2]
-        for x in range(w):
-            gray = x / (w - 1)
-            pattern[:, x, :] = gray
+        self._generate_tone_ramp(pattern)
 
     def _generate_smpte_bars(self, pattern: np.ndarray) -> None:
-        """Generate SMPTE color bars."""
         h, w = pattern.shape[:2]
         bar_width = w // 7
-
-        # SMPTE color bars pattern
         bars = [
-            (255, 255, 255),  # White
-            (255, 255, 0),   # Yellow
-            (0, 255, 255),   # Cyan
-            (0, 255, 0),     # Green
-            (255, 0, 255),   # Magenta
-            (255, 0, 0),     # Red
-            (0, 0, 255),     # Blue
+            (1.0, 1.0, 1.0),
+            (1.0, 1.0, 0.0),
+            (0.0, 1.0, 1.0),
+            (0.0, 1.0, 0.0),
+            (1.0, 0.0, 1.0),
+            (1.0, 0.0, 0.0),
+            (0.0, 0.0, 1.0),
         ]
-
         for i, (r, g, b) in enumerate(bars):
-            if i < len(bars):
-                x_start = i * bar_width
-                x_end = min((i + 1) * bar_width, w)
-                pattern[:, x_start:x_end, 0] = r / 255.0
-                pattern[:, x_start:x_end, 1] = g / 255.0
-                pattern[:, x_start:x_end, 2] = b / 255.0
+            x_start = i * bar_width
+            x_end = min((i + 1) * bar_width, w)
+            pattern[:, x_start:x_end, 0] = r
+            pattern[:, x_start:x_end, 1] = g
+            pattern[:, x_start:x_end, 2] = b
 
     def _generate_color_checker(self, pattern: np.ndarray) -> None:
-        """Generate a simplified ColorChecker pattern."""
         h, w = pattern.shape[:2]
         patch_height = h // 4
         patch_width = w // 6
-
-        # Simplified ColorChecker colors (24 patches in 4x6 grid)
         colors = [
-            [0.42, 0.31, 0.28],  # Dark Skin
-            [0.62, 0.44, 0.38],  # Light Skin
-            [0.31, 0.33, 0.35],  # Blue Sky
-            [0.15, 0.20, 0.24],  # Foliage
-            [0.50, 0.23, 0.17],  # Blue Flower
-            [0.14, 0.14, 0.14],  # Bluish Gray
-            [0.43, 0.34, 0.22],  # Orange
-            [0.19, 0.21, 0.05],  # Purplish Blue
-            [0.35, 0.37, 0.36],  # Moderate Red
-            [0.39, 0.27, 0.21],  # Purple
-            [0.53, 0.48, 0.45],  # Yellow Green
-            [0.25, 0.25, 0.25],  # Orange Yellow
-            [0.59, 0.35, 0.33],  # Blue
-            [0.35, 0.35, 0.35],  # Green
-            [0.19, 0.20, 0.18],  # Red
-            [0.62, 0.62, 0.62],  # Yellow
-            [0.19, 0.28, 0.35],  # Magenta
-            [0.14, 0.14, 0.14],  # Cyan
-            [0.85, 0.85, 0.85],  # White
-            [0.58, 0.58, 0.58],  # Neutral 8
-            [0.35, 0.35, 0.35],  # Neutral 6.5
-            [0.19, 0.19, 0.19],  # Neutral 5
-            [0.12, 0.12, 0.12],  # Neutral 3.5
-            [0.06, 0.06, 0.06],  # Black
+            [0.42, 0.31, 0.28], [0.62, 0.44, 0.38], [0.31, 0.33, 0.35], [0.15, 0.20, 0.24],
+            [0.50, 0.23, 0.17], [0.14, 0.14, 0.14], [0.43, 0.34, 0.22], [0.19, 0.21, 0.05],
+            [0.35, 0.37, 0.36], [0.39, 0.27, 0.21], [0.53, 0.48, 0.45], [0.25, 0.25, 0.25],
+            [0.59, 0.35, 0.33], [0.35, 0.35, 0.35], [0.19, 0.20, 0.18], [0.62, 0.62, 0.62],
+            [0.19, 0.28, 0.35], [0.14, 0.14, 0.14], [0.85, 0.85, 0.85], [0.58, 0.58, 0.58],
+            [0.35, 0.35, 0.35], [0.19, 0.19, 0.19], [0.12, 0.12, 0.12], [0.06, 0.06, 0.06],
         ]
-
         for i in range(4):
             for j in range(6):
-                if i * 6 + j < len(colors):
-                    y_start = i * patch_height
-                    y_end = (i + 1) * patch_height
-                    x_start = j * patch_width
-                    x_end = (j + 1) * patch_width
-
-                    color = colors[i * 6 + j]
-                    pattern[y_start:y_end, x_start:x_end, 0] = color[0]
-                    pattern[y_start:y_end, x_start:x_end, 1] = color[1]
-                    pattern[y_start:y_end, x_start:x_end, 2] = color[2]
+                idx = i * 6 + j
+                if idx < len(colors):
+                    y0, y1 = i * patch_height, (i + 1) * patch_height
+                    x0, x1 = j * patch_width, (j + 1) * patch_width
+                    pattern[y0:y1, x0:x1, 0] = colors[idx][0]
+                    pattern[y0:y1, x0:x1, 1] = colors[idx][1]
+                    pattern[y0:y1, x0:x1, 2] = colors[idx][2]
