@@ -24,11 +24,12 @@ A ComfyUI custom node for reading color profiles and color space information fro
 |--------|------|------|
 | Dominant Colors Advanced | Color Tools/Analysis | 支持全图 / 边缘 / 中心三种采样模式，输出主色色带预览 |
 | Dominant Colors Advanced (Multiple) | Color Tools/Analysis | 多图版本，支持 batch 和 list 输入，合并像素池后统一聚类 |
-| Luminance Calculator | Color Tools/Analysis | W3C WCAG 相对亮度公式，判断颜色深浅 |
+| Luminance Calculator | Color Tools/Analysis | W3C WCAG 相对亮度公式，可选阈值判断深色 / 浅色主题 |
 | Collage Background Color | Color Tools/Analysis | 提取多图边缘色，K-means 后去饱和，输出拼版底色 |
 | RGB/HEX Convert + Adjust | Color Tools/Conversion | HEX ↔ RGB 互转 + HSV 调整（色相、饱和度、明度） |
 | RGB Array Resolve | Color Tools/Analysis | 按索引从主色数组中取出单个颜色，输出 R/G/B + HEX + 预览 |
 | Color Harmonizer | Color Tools/Analysis | 基于图片主色色相，生成互补 / 类似 / 三角等和谐配色 |
+| **Color Space Inspector** | Color Tools/Analysis | 输入单色，转换到所有颜色空间，输出 512×512 预览图 + 完整 JSON |
 
 The following nodes were added on top of the original package.
 
@@ -81,13 +82,52 @@ Batch / list-aware version of Dominant Colors Advanced. Accepts both IMAGE batch
 Calculates perceptual luminance from a color using the W3C WCAG relative luminance formula (sRGB IEC 61966-2-1 gamma correction). Useful for deciding whether to display light or dark UI text on a given background color.
 
 **Inputs:**
-- `input_mode` (COMBO): `RGB` or `HEX`
-- `red`, `green`, `blue` (FLOAT): Normalized 0–1 values (used in RGB mode)
+- `input_mode` (COMBO): `rgb` or `hex`
+- `luminance_threshold` (COMBO): Threshold for `ui_theme` judgement — `0.350 (perceptual)` / `0.200 (conservative)` / `0.179 (WCAG precise)`
+- `r`, `g`, `b` (INT): 0–255 values (used in RGB mode)
 - `hex_color` (STRING): `#RRGGBB` hex string (used in HEX mode)
 
 **Outputs:**
-- `luminance` (FLOAT): Relative luminance value in [0, 1]; values above ~0.179 are considered "light"
-- `result_json` (STRING): Full calculation details as JSON
+- `luminance` (FLOAT): Relative luminance in [0, 1]
+- `result_json` (STRING): JSON including input color, luminance value, and `ui_theme` (`"dark"` / `"light"`)
+
+---
+
+### **🎨 Color Space Inspector**
+**Category:** Color Tools/Analysis
+
+Input a single color in any common color space, convert it to all supported spaces simultaneously, and generate a 512×512 preview image with all values overlaid directly on the color swatch.
+
+**Inputs:**
+- `input_mode` (COMBO): `rgb` / `hex` / `hsv` / `hsl` / `lab` / `cmyk`
+- `luminance_threshold` (COMBO): Controls `luminance_theme` output — `0.350 (perceptual)` / `0.200 (conservative)` / `0.179 (WCAG precise)`
+- RGB: `r`, `g`, `b` (INT, 0–255)
+- HEX: `hex_color` (STRING) — `#` is optional
+- HSV: `hsv_h` (0–360°), `hsv_s`, `hsv_v` (0–1)
+- HSL: `hsl_h` (0–360°), `hsl_s`, `hsl_l` (0–1)
+- LAB: `lab_L` (0–100), `lab_a`, `lab_b` (−128–127)
+- CMYK: `cmyk_c`, `cmyk_m`, `cmyk_y`, `cmyk_k` (0–1)
+
+**Outputs:**
+- `preview_image` (IMAGE): 512×512 solid color swatch with HSV / HSL / LAB / OKLCH / CMYK values printed on top; text color (dark/light) auto-selected at threshold 0.35
+- `hex_out` (STRING): `#rrggbb`
+- `r`, `g`, `b` (FLOAT): 0–255
+- `luminance_theme` (STRING): `"light"` or `"dark"` based on selected threshold
+- `out_json` (STRING): Full JSON with all color space values including WCAG luminance
+
+**out_json example:**
+```json
+{
+  "hex": "#ff6432",
+  "rgb": {"r": 255, "g": 100, "b": 50},
+  "wcag_luminance": 0.164,
+  "hsv":   {"h": 16.36, "s": 0.804, "v": 1.0},
+  "hsl":   {"h": 16.36, "s": 1.0,   "l": 0.598},
+  "lab":   {"L": 58.3,  "a": 42.1,  "b": 46.2},
+  "oklch": {"L": 0.672, "c": 0.181, "h": 41.3},
+  "cmyk":  {"c": 0.0,   "m": 0.608, "y": 0.804, "k": 0.0}
+}
+```
 
 ---
 
