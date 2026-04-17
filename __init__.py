@@ -115,10 +115,36 @@ except Exception as e:
     print(f"[ComfyUI Color Tools] ⚠️ ColorSpaceInspector unavailable: {e}")
 
 try:
+    from .nodes.dominant_color_filter import DominantColorFilter
+    NODE_CLASS_MAPPINGS["DominantColorFilter"] = DominantColorFilter
+except Exception as e:
+    print(f"[ComfyUI Color Tools] ⚠️ DominantColorFilter unavailable: {e}")
+
+try:
+    from .nodes.hue_distance import HueDistance
+    from .nodes.hue_matcher import HueMatcher
+    NODE_CLASS_MAPPINGS["HueDistance"] = HueDistance
+    NODE_CLASS_MAPPINGS["HueMatcher"]  = HueMatcher
+except Exception as e:
+    print(f"[ComfyUI Color Tools] ⚠️ Hue nodes unavailable: {e}")
+
+try:
     from .nodes.vector_scope import VectorScopeNode
     NODE_CLASS_MAPPINGS["VectorScope"] = VectorScopeNode
 except Exception as e:
     print(f"[ComfyUI Color Tools] ⚠️ Vector scope node unavailable: {e}")
+
+try:
+    from .nodes.get_accent_color_from_images import GetAccentColorFromImages
+    NODE_CLASS_MAPPINGS["GetAccentColorFromImages"] = GetAccentColorFromImages
+except Exception as e:
+    print(f"[ComfyUI Color Tools] ⚠️ GetAccentColorFromImages unavailable: {e}")
+
+try:
+    from .nodes.accent_color_matcher import AccentColorMatcher
+    NODE_CLASS_MAPPINGS["AccentColorMatcher"] = AccentColorMatcher
+except Exception as e:
+    print(f"[ComfyUI Color Tools] ⚠️ AccentColorMatcher unavailable: {e}")
 
 # ── OCIO nodes (require PyOpenColorIO) ────────────────────────────────────────
 try:
@@ -163,11 +189,16 @@ _ALL_DISPLAY_NAMES = {
     "NaturalBackgroundColor": "Color Harmonizer",
     "RGBArrayResolve": "RGB Array Resolve",
     "ColorSpaceInspector": "Color Space Inspector",
+    "DominantColorFilter": "Dominant Color Filter",
+    "HueDistance": "Hue Distance",
+    "HueMatcher":  "Hue Matcher",
     "VectorScope": "Vector Scope",
     "OCIOColorSpaceConverter": "OCIO Color Space Converter",
     "OCIOConfigInfo": "OCIO Config Info",
     "TestPatternGenerator": "Test Pattern Generator",
     "AdvancedOcioColorTransform": "Advanced OCIO Color Transform",
+    "GetAccentColorFromImages": "Get Accent Color from Images",
+    "AccentColorMatcher":       "Accent Color Matcher",
 }
 
 # Only expose display names for nodes that actually loaded

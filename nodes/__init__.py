@@ -60,6 +60,10 @@ from .color_space_inspector import (
     ColorSpaceInspector,
 )
 
+from .dominant_color_filter import (
+    DominantColorFilter,
+)
+
 # Import utility functions
 from .color_utils import (
     ColorInputHandler,
@@ -108,6 +112,9 @@ __all__ = [
 
     # Color Space Inspector
     "ColorSpaceInspector",
+
+    # Dominant Color Filter
+    "DominantColorFilter",
     
     # Utility Functions
     "ColorInputHandler",
